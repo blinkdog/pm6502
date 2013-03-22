@@ -23,8 +23,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
-import static com.pmeade.cpu.pm6502.Cpu6502.RESET_HI;
-import static com.pmeade.cpu.pm6502.Cpu6502.RESET_LO;
+import static com.pmeade.cpu.pm6502.Cpu6502.*;
 
 /**
  * @author pmeade
@@ -41,6 +40,11 @@ public class MemoryBuilder
             memory[RESET_HI] = ((resetAddr & 0xff00) >> 8);
         }
         
+        if(irqAddrSet) {
+            memory[IRQ_LO] = (irqAddr & 0xff);
+            memory[IRQ_HI] = ((irqAddr & 0xff00) >> 8);
+        }
+        
         return new MemoryIO() {
             private int[] localMemory = memory;
             
@@ -54,6 +58,13 @@ public class MemoryBuilder
         };
     }
 
+    public MemoryBuilder irqAt(int address) {
+        putAddr = address;
+        irqAddr = address;
+        irqAddrSet = true;
+        return this;
+    }
+    
     public MemoryBuilder load(File binaryFile) {
         try {
             FileInputStream fileInputStream = new FileInputStream(binaryFile);
@@ -94,7 +105,9 @@ public class MemoryBuilder
     }
     
     private int[] memory;
+    private int irqAddr;
+    private boolean irqAddrSet;
+    private int putAddr;
     private int resetAddr;
     private boolean resetAddrSet;
-    private int putAddr;
 }

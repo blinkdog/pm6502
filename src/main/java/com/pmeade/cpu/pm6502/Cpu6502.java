@@ -142,7 +142,7 @@ public interface Cpu6502
         CLV, LDA, TSX, HLT, LDY, LDA, LDX, HLT,
         CPY, CMP, HLT, HLT, CPY, CMP, DEC, HLT, // c
         INY, CMP, DEX, HLT, CPY, CMP, DEC, HLT,
-        BMI, CMP, HLT, HLT, HLT, CMP, DEC, HLT, // d
+        BNE, CMP, HLT, HLT, HLT, CMP, DEC, HLT, // d
         CLD, CMP, HLT, HLT, HLT, CMP, DEC, HLT,
         CPX, SBC, HLT, HLT, CPX, SBC, INC, HLT, // e
         INX, SBC, NOP, HLT, CPX, SBC, INC, HLT,
@@ -195,6 +195,7 @@ public interface Cpu6502
     public void reset();
     public void setMemoryIO(MemoryIO mem);
     public void setAC(int i);
+    public void setSR(int i);
     public void setXR(int i);
     public void setYR(int i);
 }

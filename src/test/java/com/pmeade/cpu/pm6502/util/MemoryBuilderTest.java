@@ -324,4 +324,22 @@ public class MemoryBuilderTest
             }
         }
     }
+    
+    @Test
+    public void testIrqAt() {
+        MemoryIO mem = memoryBuilder.irqAt(0xABCD).create();
+        assertNotNull(mem);
+        for(int i=0; i<0x10000; i++) {
+            if(i == IRQ_LO) {
+                assertEquals(0xCD, mem.read(i));
+            }
+            else if(i == IRQ_HI) {
+                assertEquals(0xAB, mem.read(i));
+            }
+            else {
+                assertEquals(0x00, mem.read(i));
+            }
+        }
+    }
+    
 }

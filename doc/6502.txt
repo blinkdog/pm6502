@@ -222,6 +222,16 @@ the 6510 (the C64 processor).
   Note: only the Y-register is used in this mode.
 
   11) Relative
+
+        NOTE: This entire section is wrong. The offset for relative
+              addressing is a signed 8-bit value in two's complement 
+              form. For more information, please see:
+
+                https://en.wikipedia.org/wiki/Two%27s_complement
+
+        TODO: Rewrite the following text to accurately reflect the
+              operation of Relative addressing.
+
   This mode is used with Branch-on-Condition instructions. It is probably
   the mode you will use most often. A 1 byte value is added to the program
   counter, and the program continues execution from that address. The 1
@@ -506,7 +516,7 @@ the 6510 (the C64 processor).
   +----------------+-----------------------+---------+---------+----------+
   | Addressing Mode| Assembly Language Form| OP CODE |No. Bytes|No. Cycles|
   +----------------+-----------------------+---------+---------+----------+
-  |  Relative      |   BMI Oper            |    D0   |    2    |    2*    |
+  |  Relative      |   BNE Oper            |    D0   |    2    |    2*    |
   +----------------+-----------------------+---------+---------+----------+
   * Add 1 if branch occurs to same page.
   * Add 2 if branch occurs to different page.

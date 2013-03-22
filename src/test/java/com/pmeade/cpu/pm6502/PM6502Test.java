@@ -97,6 +97,402 @@ public class PM6502Test
 
     // ------------------------------------------------------------------------
 
+    @Test // 0x00
+    public void testBrkImplied() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0x00) // brk
+                .irqAt(0xFACE)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(7, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xFACE, cpu6502.getPC());
+        assertEquals(0xFC, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO | FLAG_BREAK | FLAG_INTERRUPT, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+        assertEquals(0xc0, mem.read(0x100 | 0xFF));
+        assertEquals(0x02, mem.read(0x100 | 0xFE));
+        assertEquals(FLAG_RESERVED | FLAG_ZERO | FLAG_BREAK, mem.read(0x100 | 0xFD));
+    }
+    
+    @Test // 0x10
+    public void testBplAccepted() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x00) // lda #$00
+                .put(0x10, 0x12) // bpl +18
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(3, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC016, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0x10
+    public void testBplAcceptedBack() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x00) // lda #$00
+                .put(0x10, 0xfc) // bpl -4
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(3, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC000, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+    
+    @Test // 0x10
+    public void testBplAcceptedWrap() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC0E0)
+                .put(0xA9, 0x00) // lda #$00
+                .put(0x10, 0x40) // bpl +64
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(4, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC124, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+    
+    @Test // 0x10
+    public void testBplRejected() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x88) // lda #$88
+                .put(0x10, 0x12) // bpl +18
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x88, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_NEGATIVE, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0x20
+    public void testJsrAbsolute() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0x20, 0xCD, 0xAB) // jsr $abcd
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(6, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xabcd, cpu6502.getPC());
+        assertEquals(0xFD, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+        assertEquals(0xC0, mem.read(0x1FF));
+        assertEquals(0x02, mem.read(0x1FE));
+    }
+    
+    @Test // 0x24
+    public void testBitZeroPage() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0xf0) // lda #$f0
+                .put(0x24, 0x25) // bit $25
+                .putAt(0x0025, 0x0f)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(3, cycles);
+        assertEquals(0xf0, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0x24
+    public void testBitZeroPageOverflow() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x0f) // lda #$0f
+                .put(0x24, 0x25) // bit $25
+                .putAt(0x0025, 0x4f)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(3, cycles);
+        assertEquals(0x0f, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_OVERFLOW, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0x24
+    public void testBitZeroPageNegative() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x0f) // lda #$0f
+                .put(0x24, 0x25) // bit $25
+                .putAt(0x0025, 0x8f)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(3, cycles);
+        assertEquals(0x0f, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_NEGATIVE, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0x29
+    public void testAndImmediate() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0xAA) // lda #$aa
+                .put(0x29, 0x55) // and #$55
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0x29
+    public void testAndImmediateNegative() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0xAA) // lda #$aa
+                .put(0x29, 0xd5) // and #$d5
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x80, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_NEGATIVE, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+    
+    @Test // 0x2C
+    public void testBitAbsolute() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x0f)       // lda #$0f
+                .put(0x2C, 0xcd, 0xab) // bit $abcd
+                .putAt(0xabcd, 0xff)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(4, cycles);
+        assertEquals(0x0f, cpu6502.getAC());
+        assertEquals(0xC005, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_NEGATIVE | FLAG_OVERFLOW, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0x2C
+    public void testBitAbsoluteFullMonty() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x3f)       // lda #$0f
+                .put(0x2C, 0xcd, 0xab) // bit $abcd
+                .putAt(0xabcd, 0xc0)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(4, cycles);
+        assertEquals(0x3f, cpu6502.getAC());
+        assertEquals(0xC005, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO | FLAG_NEGATIVE | FLAG_OVERFLOW, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0x46
+    public void testLsrZeroPage() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0x46, 0x25) // lsr $25
+                .putAt(0x0025, 0xfe)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.setSR(cpu6502.getSR() | FLAG_CARRY);
+        int cycles = cpu6502.execute();
+        
+        assertEquals(5, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC002, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+        assertEquals(0x7f, mem.read(0x0025));
+    }
+    
+    @Test // 0x4A
+    public void testLsrAccumulator() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0xff) // lda #$ff
+                .put(0x4a)       // lsr a
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x7f, cpu6502.getAC());
+        assertEquals(0xC003, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_CARRY, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0x4E
+    public void testLsrAbsolute() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0xff)       // lda #$ff
+                .put(0x4e, 0xce, 0xfa) // lsr $face
+                .putAt(0xface, 0x01)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(6, cycles);
+        assertEquals(0xff, cpu6502.getAC());
+        assertEquals(0xC005, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO | FLAG_CARRY, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+        assertEquals(0x00, mem.read(0xface));
+    }
+
+    @Test // 0x56
+    public void testLsrZeroPageX() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0x56, 0x25) // lsr $25,x
+                .putAt(0x002a, 0x21)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.setXR(0x05);
+        int cycles = cpu6502.execute();
+        
+        assertEquals(6, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC002, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_CARRY, cpu6502.getSR());
+        assertEquals(0x05, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+        assertEquals(0x10, mem.read(0x002a));
+    }
+
+    @Test // 0x5E
+    public void testLsrAbsoluteX() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xdead)
+                .put(0xA9, 0x00)       // lda #$00
+                .put(0x5e, 0xce, 0xfa) // lsr $face,x
+                .putAt(0xfade, 0x02)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.setXR(0x10);
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(7, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xdeb2, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED, cpu6502.getSR());
+        assertEquals(0x10, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+        assertEquals(0x01, mem.read(0xfade));
+    }
+
+    @Test // 0x60
+    public void testRtsImplied() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0x20, 0xCD, 0xAB) // jsr $abcd
+                .putAt(0xabcd, 0x60)   // rts
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(6, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xc003, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+        assertEquals(0xC0, mem.read(0x1FF));
+        assertEquals(0x02, mem.read(0x1FE));
+    }
+    
     @Test // 0x6C
     public void testJmpIndirect() {
         MemoryIO mem = new MemoryBuilder().startAt(0xC000)
@@ -181,6 +577,28 @@ public class PM6502Test
         assertEquals(0xAA, mem.read(0x0025));
     }
 
+    @Test // 0x86
+    public void testStxZeroPage() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA2, 0xAA) // ldx #$aa
+                .put(0x86, 0x25) // stx $25
+                .putAt(0x0025, 0x88)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(3, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_NEGATIVE, cpu6502.getSR());
+        assertEquals(0xAA, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+        assertEquals(0xAA, mem.read(0x0025));
+    }
+    
     @Test // 0x88
     public void testDeyImplied() {
         MemoryIO mem = new MemoryBuilder().startAt(0xC000)
@@ -223,6 +641,28 @@ public class PM6502Test
         MemoryIO mem = new MemoryBuilder().startAt(0xC000)
                 .put(0xA9, 0x00)       // lda #$00
                 .put(0x8D, 0xCD, 0xAB) // sta $abcd
+                .putAt(0xABCD, 0x88)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(4, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC005, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+        assertEquals(0x00, mem.read(0xABCD));
+    }
+    
+    @Test // 0x8E
+    public void testStxAbsolute() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA2, 0x00)       // ldx #$00
+                .put(0x8e, 0xCD, 0xAB) // stx $abcd
                 .putAt(0xABCD, 0x88)
                 .create();
         cpu6502.setMemoryIO(mem);
@@ -288,6 +728,29 @@ public class PM6502Test
         assertEquals(0x55, mem.read(0x002A));
     }
 
+    @Test // 0x96
+    public void testStxZeroPageY() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA2, 0x55) // ldx #$55
+                .put(0x96, 0x25) // stx $25,x
+                .putAt(0x002A, 0x88)
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.setYR(0x05);
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(4, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED, cpu6502.getSR());
+        assertEquals(0x55, cpu6502.getXR());
+        assertEquals(0x05, cpu6502.getYR());
+        assertEquals(0x55, mem.read(0x002A));
+    }
+    
     @Test // 0x99
     public void testStaAbsoluteY() {
         MemoryIO mem = new MemoryBuilder().startAt(0xB000)
@@ -309,6 +772,25 @@ public class PM6502Test
         assertEquals(0x00, cpu6502.getXR());
         assertEquals(0x2C, cpu6502.getYR());
         assertEquals(0x72, mem.read(0x2041));
+    }
+
+    @Test // 0x9A
+    public void testTxsImplied() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0x9a) // txs
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.setXR(0x80);
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC001, cpu6502.getPC());
+        assertEquals(0x80, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x80, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
     }
     
     @Test // 0x9D
@@ -615,6 +1097,86 @@ public class PM6502Test
         assertEquals(0x00, cpu6502.getYR());
     }
 
+    @Test // 0xC9
+    public void testCmpImmediateEqual() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0xD2) // lda #$d2
+                .put(0xC9, 0xD2) // cmp #$d2
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0xD2, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0xC9
+    public void testCmpImmediateLess() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0xD2) // lda #$d2
+                .put(0xC9, 0xC2) // cmp #$c2
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0xD2, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0xC9
+    public void testCmpImmediateMore() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0xd2) // lda #$d2
+                .put(0xC9, 0xe2) // cmp #$e2
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0xd2, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_NEGATIVE | FLAG_CARRY, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0xC9
+    public void testCmpImmediateNegative() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x90) // lda #$90
+                .put(0xC9, 0x01) // cmp #$01
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x90, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_NEGATIVE, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+    
     @Test // 0xCA
     public void testDexImplied() {
         MemoryIO mem = new MemoryBuilder().startAt(0xC000)
@@ -651,6 +1213,162 @@ public class PM6502Test
         assertEquals(0xFF, cpu6502.getXR());
         assertEquals(0x00, cpu6502.getYR());
     }
+
+    @Test // 0xD0
+    public void testBneAccepted() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x01) // lda #$01
+                .put(0xD0, 0x12) // bne +18
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(3, cycles);
+        assertEquals(0x01, cpu6502.getAC());
+        assertEquals(0xC016, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0xD0
+    public void testBneAcceptedBack() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x01) // lda #$01
+                .put(0xD0, 0xfc) // beq -4
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(3, cycles);
+        assertEquals(0x01, cpu6502.getAC());
+        assertEquals(0xC000, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+    
+    @Test // 0xD0
+    public void testBneAcceptedWrap() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC0E0)
+                .put(0xA9, 0x01) // lda #$01
+                .put(0xD0, 0x40) // beq +64
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(4, cycles);
+        assertEquals(0x01, cpu6502.getAC());
+        assertEquals(0xC124, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+    
+    @Test // 0xD0
+    public void testBneRejected() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xA9, 0x00) // lda #$00
+                .put(0xD0, 0x12) // beq +18
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC004, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0xD8
+    public void testCldImplied() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xD8) // cld
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.setSR(cpu6502.getSR() | FLAG_DECIMAL);
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC001, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0xE8
+    public void testInxImplied() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xE8) // inx
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.setXR(0x00);
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC001, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED, cpu6502.getSR());
+        assertEquals(0x01, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0xE8
+    public void testInxImpliedNegative() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xE8) // inx
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.setXR(0x7f);
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC001, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_NEGATIVE, cpu6502.getSR());
+        assertEquals(0x80, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+    
+    @Test // 0xE8
+    public void testInxImpliedWrap() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xE8) // inx
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.setXR(0xff);
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xC001, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
     
     @Test // 0xF0
     public void testBeqAccepted() {
@@ -676,7 +1394,7 @@ public class PM6502Test
     public void testBeqAcceptedBack() {
         MemoryIO mem = new MemoryBuilder().startAt(0xC000)
                 .put(0xA9, 0x00) // lda #$00
-                .put(0xF0, 0x84) // beq -4
+                .put(0xF0, 0xfc) // beq -4
                 .create();
         cpu6502.setMemoryIO(mem);
         cpu6502.reset();

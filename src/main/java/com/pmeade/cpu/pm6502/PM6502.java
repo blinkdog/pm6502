@@ -32,10 +32,51 @@ public class PM6502 implements Cpu6502
         calculateAddress(ADDRESS_MODES[opcode], EXTRA_CYCLES[opcode]);
         
         switch(MNEMONIC[opcode]) {
+            case AND:
+                read(ADDRESS_MODES[opcode]);
+                ac &= s1;
+                updateNZ(ac);
+                break;
             case BEQ:
                 if((sr & FLAG_ZERO) == FLAG_ZERO) {
                     branch();
                 }
+                break;
+            case BIT:
+                read(ADDRESS_MODES[opcode]);
+                updateNV(s1);
+                s1 &= ac;
+                updateZ(s1);
+                break;
+            case BNE:
+                if((sr & FLAG_ZERO) == 0x00) {
+                    branch();
+                }
+                break;
+            case BPL:
+                if((sr & FLAG_NEGATIVE) == 0x00) {
+                    branch();
+                }
+                break;
+            case BRK:
+                nextPC();
+                push((pc & 0xff00) >> 8);
+                push(pc & 0xff);
+                sr |= (FLAG_BREAK | FLAG_RESERVED);
+                push(sr);
+                sr |= FLAG_INTERRUPT;
+                pc = mem.read(IRQ_LO);
+                pc |= (mem.read(IRQ_HI) << 8);
+                break;
+            case CLD:
+                sr &= ~FLAG_DECIMAL;
+                break;
+            case CMP:
+                s1 = ac - s1;
+                if(s1 < 0) { sr |= FLAG_CARRY; }
+                else       { sr &= FLAG_CARRY; }
+                updateN(s1);
+                updateZ(s1 & 0xff);
                 break;
             case DEX:
                 xr--; xr &= 0xff;
@@ -44,6 +85,19 @@ public class PM6502 implements Cpu6502
             case DEY:
                 yr--; yr &= 0xff;
                 updateNZ(yr);
+                break;
+            case INX:
+                xr++; xr &= 0xff;
+                updateNZ(xr);
+                break;
+            case JMP:
+                pc = s2;
+                break;
+            case JSR:
+                pc--;
+                push((pc & 0xff00) >> 8);
+                push(pc & 0xff);
+                pc = s2;
                 break;
             case LDA:
                 read(ADDRESS_MODES[opcode]);
@@ -55,8 +109,18 @@ public class PM6502 implements Cpu6502
                 xr = s1;
                 updateNZ(xr);
                 break;
-            case JMP:
-                pc = s2;
+            case LSR:
+                read(ADDRESS_MODES[opcode]);
+                if((s1 & 0x01) == 0x01) { sr |= FLAG_CARRY; }
+                else                    { sr &= ~FLAG_CARRY; }
+                s1 >>= 1;
+                updateNZ(s1);
+                write(ADDRESS_MODES[opcode]);
+                break;
+            case RTS:
+                pc = pop();
+                pc |= (pop() << 8);
+                nextPC();
                 break;
             case SEI:
                 sr |= FLAG_INTERRUPT;
@@ -65,9 +129,18 @@ public class PM6502 implements Cpu6502
                 s1 = ac;
                 write(ADDRESS_MODES[opcode]);
                 break;
+            case STX:
+                s1 = xr;
+                write(ADDRESS_MODES[opcode]);
+                break;
+            case TXS:
+                sp = xr;
+                break;
             default:
                 throw new UnsupportedOperationException("Opcode: 0x" + Integer.toHexString(opcode));
         }
+        
+        System.err.println(MNEMONIC[opcode] + " " + Integer.toHexString(s2));
         
         return cycles;
     }
@@ -109,6 +182,10 @@ public class PM6502 implements Cpu6502
 
     public void setAC(int ac) {
         this.ac = ac;
+    }
+
+    public void setSR(int sr) {
+        this.sr = sr;
     }
     
     public void setXR(int xr) {
@@ -196,8 +273,9 @@ public class PM6502 implements Cpu6502
                 s4 = mem.read(pc);
                 nextPC();
                 s3 = pc;
-                if(s4 < 0x80) { s2 = pc + s4; }
-                else { s2 = pc - (s4 & 0x7f); }
+//                if(s4 < 0x80) { s2 = pc + s4; }
+//                else { s2 = pc - (s4 & 0x7f); }
+                s2 = pc + ((byte)s4);
                 s2 &= 0xffff;
                 break;
             case ZPG:
@@ -217,7 +295,7 @@ public class PM6502 implements Cpu6502
                 s2 &= 0xff;
                 break;
             default:
-                throw new UnsupportedOperationException();
+                throw new UnsupportedOperationException("AddressMode: " + addressMode);
         }
     }
     
@@ -226,6 +304,16 @@ public class PM6502 implements Cpu6502
         pc &= 0xffff;
     }
 
+    private int pop() {
+        sp++; sp &= 0xff;
+        return mem.read(0x100 | sp);
+    }
+    
+    private void push(int value) {
+        mem.write((0x100 | sp), value);
+        sp--; sp &= 0xff;
+    }
+    
     private void read(AddressMode addressMode) {
         switch(addressMode) {
             case ACC:
@@ -236,7 +324,21 @@ public class PM6502 implements Cpu6502
                 break;
         }
     }
+
+    private void updateN(int value) {
+        if((value & 0x80) == 0x80) { sr |= FLAG_NEGATIVE;  }
+        else                       { sr &= ~FLAG_NEGATIVE; }
+        sr |= FLAG_RESERVED;
+    }
     
+    private void updateNV(int value) {
+        if((value & 0x80) == 0x80) { sr |= FLAG_NEGATIVE;  }
+        else                       { sr &= ~FLAG_NEGATIVE; }
+        if((value & 0x40) == 0x40) { sr |= FLAG_OVERFLOW;  }
+        else                       { sr &= ~FLAG_OVERFLOW; }
+        sr |= FLAG_RESERVED;
+    }
+
     private void updateNZ(int value) {
         if((value & 0x80) == 0x80) { sr |= FLAG_NEGATIVE;  }
         else                       { sr &= ~FLAG_NEGATIVE; }
@@ -245,6 +347,12 @@ public class PM6502 implements Cpu6502
         sr |= FLAG_RESERVED;
     }
 
+    private void updateZ(int value) {
+        if(value == 0)             { sr |= FLAG_ZERO; }
+        else                       { sr &= ~FLAG_ZERO; }
+        sr |= FLAG_RESERVED;
+    }
+    
     private void write(AddressMode addressMode) {
         switch(addressMode) {
             case IMM:
