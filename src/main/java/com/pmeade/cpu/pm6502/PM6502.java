@@ -32,10 +32,29 @@ public class PM6502 implements Cpu6502
         calculateAddress(ADDRESS_MODES[opcode], EXTRA_CYCLES[opcode]);
         
         switch(MNEMONIC[opcode]) {
+            //case ADC: break;
             case AND:
                 read(ADDRESS_MODES[opcode]);
                 ac &= s1;
                 updateNZ(ac);
+                break;
+            case ASL:
+                read(ADDRESS_MODES[opcode]);
+                if((s1 & 0x80) == 0x80) { sr |= FLAG_CARRY; }
+                else                    { sr &= ~FLAG_CARRY; }
+                s1 <<= 1; s1 &= 0xfe;
+                updateNZ(s1);
+                write(ADDRESS_MODES[opcode]);
+                break;
+            case BCC:
+                if((sr & FLAG_CARRY) == 0x00) {
+                    branch();
+                }
+                break;
+            case BCS:
+                if((sr & FLAG_CARRY) == FLAG_CARRY) {
+                    branch();
+                }
                 break;
             case BEQ:
                 if((sr & FLAG_ZERO) == FLAG_ZERO) {
@@ -48,6 +67,7 @@ public class PM6502 implements Cpu6502
                 s1 &= ac;
                 updateZ(s1);
                 break;
+            //case BMI: break;
             case BNE:
                 if((sr & FLAG_ZERO) == 0x00) {
                     branch();
@@ -68,9 +88,16 @@ public class PM6502 implements Cpu6502
                 pc = mem.read(IRQ_LO);
                 pc |= (mem.read(IRQ_HI) << 8);
                 break;
+            //case BVC: break;
+            //case BVS: break;
+            case CLC:
+                sr &= ~FLAG_CARRY;
+                break;
             case CLD:
                 sr &= ~FLAG_DECIMAL;
                 break;
+            //case CLI: break;
+            //case CLV: break;
             case CMP:
                 s1 = ac - s1;
                 if(s1 < 0) { sr |= FLAG_CARRY; }
@@ -78,6 +105,15 @@ public class PM6502 implements Cpu6502
                 updateN(s1);
                 updateZ(s1 & 0xff);
                 break;
+            //case CPX: break;
+            case CPY:
+                s1 = yr - s1;
+                if(s1 < 0) { sr |= FLAG_CARRY; }
+                else       { sr &= FLAG_CARRY; }
+                updateN(s1);
+                updateZ(s1 & 0xff);
+                break;
+            //case DEC: break;
             case DEX:
                 xr--; xr &= 0xff;
                 updateNZ(xr);
@@ -86,9 +122,20 @@ public class PM6502 implements Cpu6502
                 yr--; yr &= 0xff;
                 updateNZ(yr);
                 break;
+            //case EOR: break;
+            case INC:
+                read(ADDRESS_MODES[opcode]);
+                s1++; s1 &= 0xff;
+                updateNZ(s1);
+                write(ADDRESS_MODES[opcode]);
+                break;
             case INX:
                 xr++; xr &= 0xff;
                 updateNZ(xr);
+                break;
+            case INY:
+                yr++; yr &= 0xff;
+                updateNZ(yr);
                 break;
             case JMP:
                 pc = s2;
@@ -109,6 +156,11 @@ public class PM6502 implements Cpu6502
                 xr = s1;
                 updateNZ(xr);
                 break;
+            case LDY:
+                read(ADDRESS_MODES[opcode]);
+                yr = s1;
+                updateNZ(yr);
+                break;
             case LSR:
                 read(ADDRESS_MODES[opcode]);
                 if((s1 & 0x01) == 0x01) { sr |= FLAG_CARRY; }
@@ -117,11 +169,27 @@ public class PM6502 implements Cpu6502
                 updateNZ(s1);
                 write(ADDRESS_MODES[opcode]);
                 break;
+            //case NOP: break;
+            case ORA:
+                read(ADDRESS_MODES[opcode]);
+                ac |= s1;
+                updateNZ(ac);
+                break;
+            //case PHA: break;
+            //case PHP: break;
+            //case PLA: break;
+            //case PLP: break;
+            //case ROL: break;
+            //case ROR: break;
+            //case RTI: break;
             case RTS:
                 pc = pop();
                 pc |= (pop() << 8);
                 nextPC();
                 break;
+            //case SBC: break;
+            //case SEC: break;
+            //case SED: break;
             case SEI:
                 sr |= FLAG_INTERRUPT;
                 break;
@@ -133,14 +201,20 @@ public class PM6502 implements Cpu6502
                 s1 = xr;
                 write(ADDRESS_MODES[opcode]);
                 break;
+            //case STY: break;
+            //case TAX: break;
+            //case TAY: break;
+            //case TSX: break;
+            //case TXA: break;
             case TXS:
                 sp = xr;
                 break;
+            //case TYA: break;
             default:
                 throw new UnsupportedOperationException("Opcode: 0x" + Integer.toHexString(opcode));
         }
         
-        System.err.println(MNEMONIC[opcode] + " " + Integer.toHexString(s2));
+//        System.err.println(MNEMONIC[opcode] + " " + Integer.toHexString(s2));
         
         return cycles;
     }

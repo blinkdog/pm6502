@@ -79,10 +79,25 @@ public class MemoryBuilder
         }
         return this;
     }
+
+    public MemoryBuilder load(int[] data) {
+        if(data != null) {
+            for(int i=0; i<data.length; i++) {
+                memory[putAddr] = data[i];
+                putAddr++;
+            }
+        }
+        return this;
+    }
     
     public MemoryBuilder loadAt(int address, File binaryFile) {
         putAddr = address;
         return load(binaryFile);
+    }
+
+    public MemoryBuilder loadAt(int address, int[] data) {
+        putAddr = address;
+        return load(data);
     }
     
     public MemoryBuilder put(int... data) {

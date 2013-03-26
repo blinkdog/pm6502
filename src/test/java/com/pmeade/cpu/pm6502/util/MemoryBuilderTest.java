@@ -20,6 +20,7 @@ package com.pmeade.cpu.pm6502.util;
 
 import com.pmeade.cpu.pm6502.MemoryIO;
 import java.io.File;
+import java.io.FileInputStream;
 import org.junit.*;
 
 import static com.pmeade.cpu.pm6502.Cpu6502.*;
@@ -341,5 +342,73 @@ public class MemoryBuilderTest
             }
         }
     }
+
+    @Test
+    public void testLoadAtArray() throws Exception {
+        File binaryFile = new File("src/test/resources/256.bin");
+        assertTrue(binaryFile.exists());
+        assertTrue(binaryFile.canRead());
+        
+        int[] data = new int[256];
+        FileInputStream fis = new FileInputStream(binaryFile);
+        for(int i=0; i<256; i++) {
+            data[i] = fis.read();
+        }
+        fis.close();
+        
+        MemoryIO mem = memoryBuilder.loadAt(0xC000,data).create();
+        assertNotNull(mem);
+        for(int i=0; i<0x10000; i++) {
+            if((i >= 0xC000) && (i < 0xC100)) {
+                assertEquals((i & 0xff), mem.read(i));
+            }
+            else {
+                assertEquals(0x00, mem.read(i));
+            }
+        }
+    }
     
+    @Test
+    public void testLoadArray() throws Exception {
+        File binaryFile = new File("src/test/resources/256.bin");
+        assertTrue(binaryFile.exists());
+        assertTrue(binaryFile.canRead());
+        
+        int[] data = new int[256];
+        FileInputStream fis = new FileInputStream(binaryFile);
+        for(int i=0; i<256; i++) {
+            data[i] = fis.read();
+        }
+        fis.close();
+        
+        MemoryIO mem = memoryBuilder.startAt(0xCFFF).put(0xEA).load(data).create();
+        assertNotNull(mem);
+        for(int i=0; i<0x10000; i++) {
+            if(i == 0xCFFF) {
+                assertEquals(0xEA, mem.read(i));
+            }
+            else if((i >= 0xD000) && (i < 0xD100)) {
+                assertEquals((i & 0xff), mem.read(i));
+            }
+            else if(i == RESET_LO) {
+                assertEquals(0xFF, mem.read(i));
+            }
+            else if(i == RESET_HI) {
+                assertEquals(0xCF, mem.read(i));
+            }
+            else {
+                assertEquals(0x00, mem.read(i));
+            }
+        }
+    }
+    
+    @Test
+    public void testLoadAtArrayNull() throws Exception {
+        int[] data = null;
+        MemoryIO mem = memoryBuilder.loadAt(0xC000, data).create();
+        assertNotNull(mem);
+        for(int i=0; i<0x10000; i++) {
+            assertEquals(0x00, mem.read(i));
+        }
+    }
 }
