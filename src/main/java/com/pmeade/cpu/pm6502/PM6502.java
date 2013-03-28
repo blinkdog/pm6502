@@ -32,7 +32,34 @@ public class PM6502 implements Cpu6502
         calculateAddress(ADDRESS_MODES[opcode], EXTRA_CYCLES[opcode]);
         
         switch(MNEMONIC[opcode]) {
-            //case ADC: break;
+            case ADC:
+                read(ADDRESS_MODES[opcode]);
+                int c1 = (((sr & FLAG_CARRY) == FLAG_CARRY) ? 1 : 0);
+                int temp = s1 + ac + c1;
+                updateZ(temp & 0xff);
+                if((sr & FLAG_DECIMAL) == FLAG_DECIMAL) {
+                    if(((ac & 0xf) + (s1 & 0xf) + c1) > 9) { temp += 6; }
+                    updateN(temp);
+                    boolean v3 = ((ac ^ s1) & 0x80) == 0x00;
+                    boolean v2 = ((ac ^ temp) & 0x80) != 0x00;
+                    boolean v1 = v2 && v3;
+                    if(v1) { sr |= FLAG_OVERFLOW; }
+                    else   { sr &= ~FLAG_OVERFLOW; }
+                    if(temp > 0x99) { temp += 96; }
+                    if(temp > 0x99) { sr |= FLAG_CARRY; }
+                    else            { sr &= ~FLAG_CARRY; }
+                } else {
+                    updateN(temp);
+                    boolean v3 = ((ac ^ s1) & 0x80) == 0x00;
+                    boolean v2 = ((ac ^ temp) & 0x80) != 0x00;
+                    boolean v1 = v2 && v3;
+                    if(v1) { sr |= FLAG_OVERFLOW; }
+                    else   { sr &= ~FLAG_OVERFLOW; }
+                    if(temp > 0xff) { sr |= FLAG_CARRY; }
+                    else            { sr &= ~FLAG_CARRY; }
+                }
+                ac = temp & 0xff;
+                break;
             case AND:
                 read(ADDRESS_MODES[opcode]);
                 ac &= s1;
@@ -188,8 +215,12 @@ public class PM6502 implements Cpu6502
                 nextPC();
                 break;
             //case SBC: break;
-            //case SEC: break;
-            //case SED: break;
+            case SEC:
+                sr |= FLAG_CARRY;
+                break;
+            case SED:
+                sr |= FLAG_DECIMAL;
+                break;
             case SEI:
                 sr |= FLAG_INTERRUPT;
                 break;
@@ -202,14 +233,20 @@ public class PM6502 implements Cpu6502
                 write(ADDRESS_MODES[opcode]);
                 break;
             //case STY: break;
-            //case TAX: break;
+            case TAX:
+                xr = ac;
+                updateNZ(xr);
+                break;
             //case TAY: break;
             //case TSX: break;
             //case TXA: break;
             case TXS:
                 sp = xr;
                 break;
-            //case TYA: break;
+            case TYA:
+                ac = yr;
+                updateNZ(ac);
+                break;
             default:
                 throw new UnsupportedOperationException("Opcode: 0x" + Integer.toHexString(opcode));
         }
