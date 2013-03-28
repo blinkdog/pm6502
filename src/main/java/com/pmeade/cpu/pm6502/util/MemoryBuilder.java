@@ -35,6 +35,11 @@ public class MemoryBuilder
     }
     
     public MemoryIO create() {
+        if(nmiAddrSet) {
+            memory[NMI_LO] = (nmiAddr & 0xff);
+            memory[NMI_HI] = ((nmiAddr & 0xff00) >> 8);
+        }
+        
         if(resetAddrSet) {
             memory[RESET_LO] = (resetAddr & 0xff);
             memory[RESET_HI] = ((resetAddr & 0xff00) >> 8);
@@ -99,6 +104,13 @@ public class MemoryBuilder
         putAddr = address;
         return load(data);
     }
+
+    public MemoryBuilder nmiAt(int address) {
+        putAddr = address;
+        nmiAddr = address;
+        nmiAddrSet = true;
+        return this;
+    }
     
     public MemoryBuilder put(int... data) {
         for(int i : data) {
@@ -122,6 +134,8 @@ public class MemoryBuilder
     private int[] memory;
     private int irqAddr;
     private boolean irqAddrSet;
+    private int nmiAddr;
+    private boolean nmiAddrSet;
     private int putAddr;
     private int resetAddr;
     private boolean resetAddrSet;

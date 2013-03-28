@@ -185,6 +185,7 @@ public interface Cpu6502
         IMP, ABY, BAD, BAD, BAD, ABX, ABX, BAD
     };
 
+    public void doNMI();
     public int execute();
     public int getAC();
     public int getPC();

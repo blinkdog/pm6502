@@ -23,6 +23,16 @@ package com.pmeade.cpu.pm6502;
  */
 public class PM6502 implements Cpu6502
 {
+    public void doNMI() {
+        push((pc & 0xff00) >> 8);
+        push(pc & 0xff);
+        sr |= FLAG_RESERVED;
+        push(sr);
+        sr |= FLAG_INTERRUPT;
+        pc = mem.read(NMI_LO);
+        pc |= (mem.read(NMI_HI) << 8);
+    }
+
     public int execute() {
         int opcode = mem.read(pc);
         nextPC();
@@ -250,7 +260,7 @@ public class PM6502 implements Cpu6502
             default:
                 throw new UnsupportedOperationException("Opcode: 0x" + Integer.toHexString(opcode));
         }
-        
+
 //        System.err.println(MNEMONIC[opcode] + " " + Integer.toHexString(s2));
         
         return cycles;

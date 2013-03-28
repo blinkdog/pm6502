@@ -95,6 +95,30 @@ public class PM6502Test
         verify(mem);
     }
 
+    @Test
+    public void testDoNmi() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC004)
+                .put(0xa9, 0x55) // lda #$55
+                .nmiAt(0xface)
+                .put(0xa2, 0x77) // ldx #$77
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.doNMI();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x00, cpu6502.getAC());
+        assertEquals(0xfad0, cpu6502.getPC());
+        assertEquals(0xfc, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_INTERRUPT, cpu6502.getSR());
+        assertEquals(0x77, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+        assertEquals(0xc0, mem.read(0x100 | 0xFF));
+        assertEquals(0x04, mem.read(0x100 | 0xFE));
+        assertEquals(FLAG_RESERVED | FLAG_ZERO, mem.read(0x100 | 0xFD));
+    }
+    
     // ------------------------------------------------------------------------
 
     @Test // 0x00
@@ -747,6 +771,30 @@ public class PM6502Test
                      | FLAG_DECIMAL
                      | FLAG_ZERO
                      | FLAG_CARRY, cpu6502.getSR());
+        assertEquals(0x00, cpu6502.getXR());
+        assertEquals(0x00, cpu6502.getYR());
+    }
+
+    @Test // 0x69
+    public void testAdcImmediateBcd2() {
+        MemoryIO mem = new MemoryBuilder().startAt(0xC000)
+                .put(0xf8)       // sed
+                .put(0x38)       // sec
+                .put(0xa9, 0x00) // lda #$00
+                .put(0x69, 0x00) // adc #$00
+                .create();
+        cpu6502.setMemoryIO(mem);
+        cpu6502.reset();
+        cpu6502.execute();
+        cpu6502.execute();
+        cpu6502.execute();
+        int cycles = cpu6502.execute();
+        
+        assertEquals(2, cycles);
+        assertEquals(0x01, cpu6502.getAC());
+        assertEquals(0xC006, cpu6502.getPC());
+        assertEquals(0xFF, cpu6502.getSP());
+        assertEquals(FLAG_RESERVED | FLAG_DECIMAL, cpu6502.getSR());
         assertEquals(0x00, cpu6502.getXR());
         assertEquals(0x00, cpu6502.getYR());
     }
