@@ -34,6 +34,8 @@ public class PM6502 implements Cpu6502
     }
 
     public int execute() {
+        int c1;
+        int temp;
         int opcode = mem.read(pc);
         nextPC();
         
@@ -44,8 +46,8 @@ public class PM6502 implements Cpu6502
         switch(MNEMONIC[opcode]) {
             case ADC:
                 read(ADDRESS_MODES[opcode]);
-                int c1 = (((sr & FLAG_CARRY) == FLAG_CARRY) ? 1 : 0);
-                int temp = s1 + ac + c1;
+                c1 = (((sr & FLAG_CARRY) == FLAG_CARRY) ? 1 : 0);
+                temp = s1 + ac + c1;
                 updateZ(temp & 0xff);
                 if((sr & FLAG_DECIMAL) == FLAG_DECIMAL) {
                     if(((ac & 0xf) + (s1 & 0xf) + c1) > 9) { temp += 6; }
@@ -104,7 +106,11 @@ public class PM6502 implements Cpu6502
                 s1 &= ac;
                 updateZ(s1);
                 break;
-            //case BMI: break;
+            case BMI:
+                if((sr & FLAG_NEGATIVE) == FLAG_NEGATIVE) {
+                    branch();
+                }
+                break;
             case BNE:
                 if((sr & FLAG_ZERO) == 0x00) {
                     branch();
@@ -125,16 +131,28 @@ public class PM6502 implements Cpu6502
                 pc = mem.read(IRQ_LO);
                 pc |= (mem.read(IRQ_HI) << 8);
                 break;
-            //case BVC: break;
-            //case BVS: break;
+            case BVC:
+                if((sr & FLAG_OVERFLOW) == 0x00) {
+                    branch();
+                }
+                break;
+            case BVS:
+                if((sr & FLAG_OVERFLOW) == FLAG_OVERFLOW) {
+                    branch();
+                }
+                break;
             case CLC:
                 sr &= ~FLAG_CARRY;
                 break;
             case CLD:
                 sr &= ~FLAG_DECIMAL;
                 break;
-            //case CLI: break;
-            //case CLV: break;
+            case CLI:
+                sr &= ~FLAG_INTERRUPT;
+                break;
+            case CLV:
+                sr &= ~FLAG_OVERFLOW;
+                break;
             case CMP:
                 s1 = ac - s1;
                 if(s1 < 0) { sr |= FLAG_CARRY; }
@@ -142,7 +160,13 @@ public class PM6502 implements Cpu6502
                 updateN(s1);
                 updateZ(s1 & 0xff);
                 break;
-            //case CPX: break;
+            case CPX:
+                s1 = xr - s1;
+                if(s1 < 0) { sr |= FLAG_CARRY; }
+                else       { sr &= FLAG_CARRY; }
+                updateN(s1);
+                updateZ(s1 & 0xff);
+                break;
             case CPY:
                 s1 = yr - s1;
                 if(s1 < 0) { sr |= FLAG_CARRY; }
@@ -150,7 +174,12 @@ public class PM6502 implements Cpu6502
                 updateN(s1);
                 updateZ(s1 & 0xff);
                 break;
-            //case DEC: break;
+            case DEC:
+                read(ADDRESS_MODES[opcode]);
+                s1--; s1 &= 0xff;
+                updateNZ(s1);
+                write(ADDRESS_MODES[opcode]);
+                break;
             case DEX:
                 xr--; xr &= 0xff;
                 updateNZ(xr);
@@ -159,7 +188,11 @@ public class PM6502 implements Cpu6502
                 yr--; yr &= 0xff;
                 updateNZ(yr);
                 break;
-            //case EOR: break;
+            case EOR:
+                read(ADDRESS_MODES[opcode]);
+                ac ^= s1;
+                updateNZ(ac);
+                break;
             case INC:
                 read(ADDRESS_MODES[opcode]);
                 s1++; s1 &= 0xff;
@@ -206,25 +239,78 @@ public class PM6502 implements Cpu6502
                 updateNZ(s1);
                 write(ADDRESS_MODES[opcode]);
                 break;
-            //case NOP: break;
+            case NOP:
+                // this instruction intentionally left blank
+                break;
             case ORA:
                 read(ADDRESS_MODES[opcode]);
                 ac |= s1;
                 updateNZ(ac);
                 break;
-            //case PHA: break;
-            //case PHP: break;
-            //case PLA: break;
-            //case PLP: break;
-            //case ROL: break;
-            //case ROR: break;
-            //case RTI: break;
+            case PHA:
+                push(ac);
+                break;
+            case PHP:
+                sr |= FLAG_RESERVED;
+                push(sr);
+                break;
+            case PLA:
+                ac = pop();
+                updateNZ(ac);
+                break;
+            case PLP:
+                sr = pop();
+                sr |= FLAG_RESERVED;
+                break;
+            case ROL:
+                read(ADDRESS_MODES[opcode]);
+                s1 <<= 1;
+                if((sr & FLAG_CARRY) == FLAG_CARRY) { s1 |= 0x01; }
+                if(s1 > 0xff) { sr |= FLAG_CARRY; }
+                else          { sr &= ~FLAG_CARRY; }
+                s1 &= 0xff;
+                updateNZ(s1);
+                write(ADDRESS_MODES[opcode]);
+                break;
+            case ROR:
+                read(ADDRESS_MODES[opcode]);
+                if((sr & FLAG_CARRY) == FLAG_CARRY) { s1 |= 0x100; }
+                if((s1 & 0x01) == 0x01) { sr |= FLAG_CARRY; }
+                else                    { sr &= ~FLAG_CARRY; }
+                s1 >>= 1;
+                updateNZ(s1);
+                write(ADDRESS_MODES[opcode]);
+                break;
+            case RTI:
+                sr = pop();
+                sr |= FLAG_RESERVED;
+                pc = pop();
+                pc |= (pop() << 8);
+                break;
             case RTS:
                 pc = pop();
                 pc |= (pop() << 8);
                 nextPC();
                 break;
-            //case SBC: break;
+            case SBC:
+                read(ADDRESS_MODES[opcode]);
+                c1 = (((sr & FLAG_CARRY) == FLAG_CARRY) ? 0 : 1);
+                temp = ac - s1 - c1;
+                updateN(temp);
+                updateZ(temp & 0xff);
+                boolean v3 = ((ac ^ temp) & 0x80) != 0x00;
+                boolean v2 = ((ac ^ s1) & 0x80) != 0x00;
+                boolean v1 = v2 && v3;
+                if(v1) { sr |= FLAG_OVERFLOW; }
+                else   { sr &= ~FLAG_OVERFLOW; }
+                if((sr & FLAG_DECIMAL) == FLAG_DECIMAL) {
+                    if(((ac & 0xf) - (c1)) < (s1 & 0xf)) { temp -= 0x6; }
+                    if(temp > 0x99) { temp -= 0x60; }
+                }
+                if(temp < 0x100) { sr |= FLAG_CARRY; }
+                else             { sr &= ~FLAG_CARRY; }
+                ac = temp & 0xff;
+                break;
             case SEC:
                 sr |= FLAG_CARRY;
                 break;
@@ -242,14 +328,26 @@ public class PM6502 implements Cpu6502
                 s1 = xr;
                 write(ADDRESS_MODES[opcode]);
                 break;
-            //case STY: break;
+            case STY:
+                s1 = yr;
+                write(ADDRESS_MODES[opcode]);
+                break;
             case TAX:
                 xr = ac;
                 updateNZ(xr);
                 break;
-            //case TAY: break;
-            //case TSX: break;
-            //case TXA: break;
+            case TAY:
+                yr = ac;
+                updateNZ(yr);
+                break;
+            case TSX:
+                xr = sp;
+                updateNZ(xr);
+                break;
+            case TXA:
+                ac = xr;
+                updateNZ(ac);
+                break;
             case TXS:
                 sp = xr;
                 break;
@@ -261,8 +359,6 @@ public class PM6502 implements Cpu6502
                 throw new UnsupportedOperationException("Opcode: 0x" + Integer.toHexString(opcode));
         }
 
-//        System.err.println(MNEMONIC[opcode] + " " + Integer.toHexString(s2));
-        
         return cycles;
     }
     
@@ -305,6 +401,10 @@ public class PM6502 implements Cpu6502
         this.ac = ac;
     }
 
+    public void setSP(int sp) {
+        this.sp = sp;
+    }
+    
     public void setSR(int sr) {
         this.sr = sr;
     }

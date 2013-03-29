@@ -43,11 +43,12 @@ public interface Cpu6502
     public static final int FLAG_NEGATIVE  = 0x80; // b10000000
 
     public static final int[] CYCLES = {
+     // 0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
         7, 6, 0, 0, 0, 3, 5, 0, 3, 2, 2, 0, 0, 4, 6, 0, // 0
         2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0, // 1
         6, 6, 0, 0, 3, 3, 5, 0, 4, 2, 2, 0, 4, 4, 6, 0, // 2
         2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0, // 3
-        4, 6, 0, 0, 0, 3, 5, 0, 3, 2, 2, 0, 3, 6, 6, 0, // 4
+        6, 6, 0, 0, 0, 3, 5, 0, 3, 2, 2, 0, 3, 4, 6, 0, // 4
         2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0, // 5
         6, 6, 0, 0, 0, 3, 5, 0, 4, 2, 2, 0, 5, 4, 6, 0, // 6
         2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0, // 7
@@ -62,11 +63,12 @@ public interface Cpu6502
     };
 
     public static final int[] LENGTH = {
+     // 0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
         1, 2, 0, 0, 0, 2, 2, 0, 1, 2, 1, 0, 0, 3, 3, 0, // 0
         2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0, // 1
         3, 2, 0, 0, 2, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0, // 2
         2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0, // 3
-        3, 2, 0, 0, 0, 2, 2, 0, 1, 2, 1, 0, 3, 1, 3, 0, // 4
+        1, 2, 0, 0, 0, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0, // 4
         2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0, // 5
         1, 2, 0, 0, 0, 2, 2, 0, 1, 2, 1, 0, 3, 3, 3, 0, // 6
         2, 2, 0, 0, 0, 2, 2, 0, 1, 3, 0, 0, 0, 3, 3, 0, // 7
@@ -124,8 +126,8 @@ public interface Cpu6502
         PLP, AND, ROL, HLT, BIT, AND, ROL, HLT,
         BMI, AND, HLT, HLT, HLT, AND, ROL, HLT, // 3
         SEC, AND, HLT, HLT, HLT, AND, ROL, HLT,
-        EOR, EOR, HLT, HLT, HLT, EOR, LSR, HLT, // 4
-        PHA, EOR, LSR, HLT, JMP, RTI, LSR, HLT,
+        RTI, EOR, HLT, HLT, HLT, EOR, LSR, HLT, // 4
+        PHA, EOR, LSR, HLT, JMP, EOR, LSR, HLT,
         BVC, EOR, HLT, HLT, HLT, EOR, LSR, HLT, // 5
         CLI, EOR, HLT, HLT, HLT, EOR, LSR, HLT,
         RTS, ADC, HLT, HLT, HLT, ADC, ROR, HLT, // 6
@@ -159,8 +161,8 @@ public interface Cpu6502
         IMP, IMM, ACC, BAD, ABS, ABS, ABS, BAD,
         REL, IDY, BAD, BAD, BAD, ZPX, ZPX, BAD, // 3
         IMP, ABY, BAD, BAD, BAD, ABX, ABX, BAD,
-        ABS, IDX, BAD, BAD, BAD, ZPG, ZPG, BAD, // 4
-        IMP, IMM, ACC, BAD, ABS, IMP, ABS, BAD,
+        IMP, IDX, BAD, BAD, BAD, ZPG, ZPG, BAD, // 4
+        IMP, IMM, ACC, BAD, ABS, ABS, ABS, BAD,
         REL, IDY, BAD, BAD, BAD, ZPX, ZPX, BAD, // 5
         IMP, ABY, BAD, BAD, BAD, ABX, ABX, BAD,
         IMP, IDX, BAD, BAD, BAD, ZPG, ZPG, BAD, // 6
@@ -196,6 +198,7 @@ public interface Cpu6502
     public void reset();
     public void setMemoryIO(MemoryIO mem);
     public void setAC(int i);
+    public void setSP(int i);
     public void setSR(int i);
     public void setXR(int i);
     public void setYR(int i);

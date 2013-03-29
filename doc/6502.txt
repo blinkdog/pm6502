@@ -651,7 +651,7 @@ the 6510 (the C64 processor).
   +----------------+-----------------------+---------+---------+----------+
   | Addressing Mode| Assembly Language Form| OP CODE |No. Bytes|No. Cycles|
   +----------------+-----------------------+---------+---------+----------+
-  |  Immediate     |   CPX *Oper           |    E0   |    2    |    2     |
+  |  Immediate     |   CPX #Oper           |    E0   |    2    |    2     |
   |  Zero Page     |   CPX Oper            |    E4   |    2    |    3     |
   |  Absolute      |   CPX Oper            |    EC   |    3    |    4     |
   +----------------+-----------------------+---------+---------+----------+
@@ -663,7 +663,7 @@ the 6510 (the C64 processor).
   +----------------+-----------------------+---------+---------+----------+
   | Addressing Mode| Assembly Language Form| OP CODE |No. Bytes|No. Cycles|
   +----------------+-----------------------+---------+---------+----------+
-  |  Immediate     |   CPY *Oper           |    C0   |    2    |    2     |
+  |  Immediate     |   CPY #Oper           |    C0   |    2    |    2     |
   |  Zero Page     |   CPY Oper            |    C4   |    2    |    3     |
   |  Absolute      |   CPY Oper            |    CC   |    3    |    4     |
   +----------------+-----------------------+---------+---------+----------+
@@ -719,7 +719,7 @@ the 6510 (the C64 processor).
   |  Immediate     |   EOR #Oper           |    49   |    2    |    2     |
   |  Zero Page     |   EOR Oper            |    45   |    2    |    3     |
   |  Zero Page,X   |   EOR Oper,X          |    55   |    2    |    4     |
-  |  Absolute      |   EOR Oper            |    40   |    3    |    4     |
+  |  Absolute      |   EOR Oper            |    4D   |    3    |    4     |
   |  Absolute,X    |   EOR Oper,X          |    5D   |    3    |    4*    |
   |  Absolute,Y    |   EOR Oper,Y          |    59   |    3    |    4*    |
   |  (Indirect,X)  |   EOR (Oper,X)        |    41   |    2    |    6     |
@@ -916,7 +916,7 @@ the 6510 (the C64 processor).
   PLA                 PLA Pull accumulator from stack                   PLA
 
   Operation:  A fromS                                   N Z C I D V
-                                                        _ _ _ _ _ _
+                                                        / / _ _ _ _
                                  (Ref: 8.6)
   +----------------+-----------------------+---------+---------+----------+
   | Addressing Mode| Assembly Language Form| OP CODE |No. Bytes|No. Cycles|
@@ -925,7 +925,7 @@ the 6510 (the C64 processor).
   +----------------+-----------------------+---------+---------+----------+
 
 
-  PLP               PLP Pull processor status from stack                PLA
+  PLP               PLP Pull processor status from stack                PLP
 
   Operation:  P fromS                                   N Z C I D V
                                                          From Stack
@@ -985,7 +985,7 @@ the 6510 (the C64 processor).
   +----------------+-----------------------+---------+---------+----------+
   | Addressing Mode| Assembly Language Form| OP CODE |No. Bytes|No. Cycles|
   +----------------+-----------------------+---------+---------+----------+
-  |  Implied       |   RTI                 |    4D   |    1    |    6     |
+  |  Implied       |   RTI                 |    40   |    1    |    6     |
   +----------------+-----------------------+---------+---------+----------+
 
 
@@ -1043,7 +1043,7 @@ the 6510 (the C64 processor).
   +----------------+-----------------------+---------+---------+----------+
 
 
-  SEI                 SEI Set interrupt disable status                  SED
+  SEI                 SEI Set interrupt disable status                  SEI
                                                         N Z C I D V
   Operation:  1 -> I                                    _ _ _ 1 _ _
                                 (Ref: 3.2.1)
@@ -1356,7 +1356,7 @@ the 6510 (the C64 processor).
         9E - Future Expansion           BE - LDX - Absolute,Y
         9F - Future Expansion           BF - Future Expansion
 
-        C0 - Cpy - Immediate            E0 - CPX - Immediate
+        C0 - CPY - Immediate            E0 - CPX - Immediate
         C1 - CMP - (Indirect,X)         E1 - SBC - (Indirect,X)
         C2 - Future Expansion           E2 - Future Expansion
         C3 - Future Expansion           E3 - Future Expansion
